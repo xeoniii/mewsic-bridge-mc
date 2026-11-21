@@ -1,7 +1,7 @@
 {
 	"schemaVersion": 1,
 	"id": "mewsic-bridge",
-	"version": "2.0",
+	"version": "v2.0+26.3",
 	"name": "Mewsic Bridge",
 	"description": "Bridges the Mewsic desktop music player with Minecraft via a local WebSocket server. Displays the currently playing track on the HUD.",
 	"authors": [

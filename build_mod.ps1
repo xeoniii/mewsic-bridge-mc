@@ -57,7 +57,7 @@ Fabric-Loader-Version: 0.20.1
 Set-Content -Path "build\jar-staging\META-INF\MANIFEST.MF" -Value $manifestContent -Encoding ASCII
 
 # 5. Build final JAR
-$jarName = "mewsic-bridge-2.0.jar"
+$jarName = "mewsic-bridge-v2.0+26.3.jar"
 $targetJar = Join-Path (Get-Location).Path $jarName
 if (Test-Path $targetJar) {
     Remove-Item -Force $targetJar
@@ -79,13 +79,13 @@ $instances = @(
 
 foreach ($dir in $instances) {
     if (Test-Path $dir) {
-        $oldJars = Get-ChildItem -Path $dir -Filter "mewsic-bridge-1.1*.jar"
+        $oldJars = Get-ChildItem -Path $dir -Filter "mewsic-bridge-*.jar" | Where-Object { $_.Name -ne $jarName }
         foreach ($old in $oldJars) {
             try {
                 Remove-Item $old.FullName -Force -ErrorAction Stop
                 Write-Host "Removed older version $($old.Name)"
             } catch {
-                Write-Host "File $($old.Name) locked by running game process; overwriting with 2.0 contents."
+                Write-Host "File $($old.Name) locked by running game process; overwriting with new contents."
                 Copy-Item $targetJar $old.FullName -Force
             }
         }
