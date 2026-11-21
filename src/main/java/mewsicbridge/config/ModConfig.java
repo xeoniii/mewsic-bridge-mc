@@ -20,7 +20,6 @@ public class ModConfig {
     public boolean showOnHomeScreen = true;
     public boolean showInContainers = true;
     public boolean showInOtherMenus = true;
-    public int port = 3012;
     public boolean hasCustomPosition = false;
     public int customX = 0;
     public int customY = 0;
@@ -51,17 +50,11 @@ public class ModConfig {
         if (INSTANCE == null) {
             INSTANCE = new ModConfig();
         }
-        if (INSTANCE.port < 1024 || INSTANCE.port > 65535) {
-            INSTANCE.port = 3012;
-        }
     }
 
     public static synchronized void save() {
         if (INSTANCE == null) {
             INSTANCE = new ModConfig();
-        }
-        if (INSTANCE.port < 1024 || INSTANCE.port > 65535) {
-            INSTANCE.port = 3012;
         }
         try {
             Path path = getConfigPath();

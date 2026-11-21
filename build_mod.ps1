@@ -57,7 +57,7 @@ Fabric-Loader-Version: 0.20.1
 Set-Content -Path "build\jar-staging\META-INF\MANIFEST.MF" -Value $manifestContent -Encoding ASCII
 
 # 5. Build final JAR
-$jarName = "mewsic-bridge-1.1+26.3.jar"
+$jarName = "mewsic-bridge-2.0.jar"
 $targetJar = Join-Path (Get-Location).Path $jarName
 if (Test-Path $targetJar) {
     Remove-Item -Force $targetJar
@@ -66,16 +66,30 @@ if (Test-Path $targetJar) {
 Write-Host "Creating JAR $jarName..."
 & jar -cfm $targetJar "build\jar-staging\META-INF\MANIFEST.MF" -C "build\jar-staging" .
 
+$altJar = Join-Path (Get-Location).Path "mewsic-bridge-2.0+26.3.jar"
+Copy-Item $targetJar $altJar -Force
+
 Write-Host "Built $targetJar ($( (Get-Item $targetJar).Length ) bytes) successfully!"
 
-# 6. Deploy to launcher instances
-$dest1 = "C:\Users\xeoniii\AppData\Roaming\.sklauncher\instances\fo-26-3-another-one\mods\$jarName"
-$dest2 = "C:\Users\xeoniii\AppData\Roaming\.sklauncher\instances\fo-26-3\mods\$jarName"
-if (Test-Path (Split-Path $dest1)) {
-    Copy-Item $targetJar $dest1 -Force
-    Write-Host "Deployed to $dest1"
-}
-if (Test-Path (Split-Path $dest2)) {
-    Copy-Item $targetJar $dest2 -Force
-    Write-Host "Deployed to $dest2"
+# 6. Deploy to launcher instances and clean up older versions
+$instances = @(
+    "C:\Users\xeoniii\AppData\Roaming\.sklauncher\instances\fo-26-3-another-one\mods",
+    "C:\Users\xeoniii\AppData\Roaming\.sklauncher\instances\fo-26-3\mods"
+)
+
+foreach ($dir in $instances) {
+    if (Test-Path $dir) {
+        $oldJars = Get-ChildItem -Path $dir -Filter "mewsic-bridge-1.1*.jar"
+        foreach ($old in $oldJars) {
+            try {
+                Remove-Item $old.FullName -Force -ErrorAction Stop
+                Write-Host "Removed older version $($old.Name)"
+            } catch {
+                Write-Host "File $($old.Name) locked by running game process; overwriting with 2.0 contents."
+                Copy-Item $targetJar $old.FullName -Force
+            }
+        }
+        Copy-Item $targetJar (Join-Path $dir $jarName) -Force
+        Write-Host "Deployed to $dir\$jarName"
+    }
 }

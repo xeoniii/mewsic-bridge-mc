@@ -341,18 +341,12 @@ public class MewsicHudOverlay {
 
                     optionsList.addSmall(containerToggle, otherToggle);
 
-                    Button portBtn = Button.builder(Component.literal("Port: " + ModConfig.get().port), btn -> {
-                        if (client != null) {
-                            client.setScreenAndShow(new MewsicPortScreen(soundOptionsScreen));
-                        }
-                    }).tooltip(Tooltip.create(Component.literal("WebSocket bridge server port (currently " + ModConfig.get().port + "). Click to configure the port."))).build();
-
                     Button reconnectBtn = Button.builder(Component.literal("Reconnect to Mewsic"), btn -> {
                         MewsicBridgeMod.restartServer();
                         btn.setMessage(Component.literal("Reconnecting..."));
-                    }).tooltip(Tooltip.create(Component.literal("Restart the WebSocket bridge server on ws://127.0.0.1:" + ModConfig.get().port + " to reconnect to the Mewsic player."))).build();
+                    }).tooltip(Tooltip.create(Component.literal("Restart the WebSocket bridge server on ws://127.0.0.1:3012 to reconnect to the Mewsic player."))).build();
 
-                    optionsList.addSmall(portBtn, reconnectBtn);
+                    optionsList.addBig(reconnectBtn);
                 }
             }
         });
