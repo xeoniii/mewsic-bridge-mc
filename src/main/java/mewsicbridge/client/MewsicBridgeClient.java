@@ -91,10 +91,23 @@ public class MewsicBridgeClient implements ClientModInitializer {
                         return 1;
                     })))
                 .then(ClientCommands.literal("reconnect").executes(context -> {
-                    context.getSource().sendFeedback(Component.literal("Rebooting Mewsic Bridge..."));
+                    context.getSource().sendFeedback(Component.literal("Rebooting Mewsic Bridge on port " + mewsicbridge.config.ModConfig.get().port + "..."));
                     MewsicBridgeMod.restartServer();
                     return 1;
                 }))
+                .then(ClientCommands.literal("port")
+                    .executes(context -> {
+                        context.getSource().sendFeedback(Component.literal("Current Mewsic port: " + mewsicbridge.config.ModConfig.get().port));
+                        return 1;
+                    })
+                    .then(ClientCommands.argument("number", com.mojang.brigadier.arguments.IntegerArgumentType.integer(1024, 65535)).executes(context -> {
+                        int newPort = com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(context, "number");
+                        mewsicbridge.config.ModConfig.get().port = newPort;
+                        mewsicbridge.config.ModConfig.save();
+                        context.getSource().sendFeedback(Component.literal("Mewsic port set to " + newPort + ". Reconnecting..."));
+                        MewsicBridgeMod.restartServer();
+                        return 1;
+                    })))
             );
         });
 

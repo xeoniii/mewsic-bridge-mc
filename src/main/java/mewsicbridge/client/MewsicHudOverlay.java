@@ -13,6 +13,7 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.components.OptionsList;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.gui.screens.Screen;
@@ -178,19 +179,25 @@ public class MewsicHudOverlay {
                     if (MewsicBridgeMod.wsServer != null) {
                         MewsicBridgeMod.wsServer.broadcastAction("playPrev");
                     }
-                }).bounds(0, 0, 10, 20).build();
+                }).bounds(0, 0, 10, 20)
+                  .tooltip(Tooltip.create(Component.literal("Previous Track\nPlay previous song in Mewsic")))
+                  .build();
 
                 playPauseBtn = Button.builder(Component.literal("\u23ef"), button -> {
                     if (MewsicBridgeMod.wsServer != null) {
                         MewsicBridgeMod.wsServer.broadcastAction("togglePlay");
                     }
-                }).bounds(0, 0, 10, 20).build();
+                }).bounds(0, 0, 10, 20)
+                  .tooltip(Tooltip.create(Component.literal("Play / Pause\nToggle music playback")))
+                  .build();
 
                 nextBtn = Button.builder(Component.literal("\u23ed"), button -> {
                     if (MewsicBridgeMod.wsServer != null) {
                         MewsicBridgeMod.wsServer.broadcastAction("playNext");
                     }
-                }).bounds(0, 0, 10, 20).build();
+                }).bounds(0, 0, 10, 20)
+                  .tooltip(Tooltip.create(Component.literal("Next Track\nPlay next song in Mewsic")))
+                  .build();
 
                 // Invalidate button layout cache so buttons reposition to current screen scale
                 lastLayoutLeft = -1;
@@ -288,40 +295,64 @@ public class MewsicHudOverlay {
 
                 if (optionsList != null) {
                     optionsList.addHeader(Component.literal("Mewsic Bridge"));
-                    optionsList.addSmall(
-                        CycleButton.onOffBuilder(ModConfig.get().enabled)
-                            .create(Component.literal("Mewsic HUD"), (cycleBtn, value) -> {
-                                ModConfig.get().enabled = value;
-                                ModConfig.save();
-                            }),
-                        Button.builder(Component.literal("Reset HUD Position"), btn -> {
-                            resetCustomPosition();
-                        }).build()
-                    );
-                    optionsList.addSmall(
-                        CycleButton.onOffBuilder(ModConfig.get().showInPauseMenu)
-                            .create(Component.literal("In Pause Menu"), (cycleBtn, value) -> {
-                                ModConfig.get().showInPauseMenu = value;
-                                ModConfig.save();
-                            }),
-                        CycleButton.onOffBuilder(ModConfig.get().showOnHomeScreen)
-                            .create(Component.literal("On Home Screen"), (cycleBtn, value) -> {
-                                ModConfig.get().showOnHomeScreen = value;
-                                ModConfig.save();
-                            })
-                    );
-                    optionsList.addSmall(
-                        CycleButton.onOffBuilder(ModConfig.get().showInContainers)
-                            .create(Component.literal("In Inventory & Chests"), (cycleBtn, value) -> {
-                                ModConfig.get().showInContainers = value;
-                                ModConfig.save();
-                            }),
-                        CycleButton.onOffBuilder(ModConfig.get().showInOtherMenus)
-                            .create(Component.literal("In Other Menus"), (cycleBtn, value) -> {
-                                ModConfig.get().showInOtherMenus = value;
-                                ModConfig.save();
-                            })
-                    );
+
+                    CycleButton<Boolean> hudToggle = CycleButton.onOffBuilder(ModConfig.get().enabled)
+                        .create(Component.literal("Mewsic HUD"), (cycleBtn, value) -> {
+                            ModConfig.get().enabled = value;
+                            ModConfig.save();
+                        });
+                    hudToggle.setTooltip(Tooltip.create(Component.literal("Enable or disable the Mewsic player HUD overlay.")));
+
+                    Button resetPosBtn = Button.builder(Component.literal("Reset HUD Position"), btn -> {
+                        resetCustomPosition();
+                    }).tooltip(Tooltip.create(Component.literal("Reset the HUD overlay position back to the default bottom-right corner."))).build();
+
+                    optionsList.addSmall(hudToggle, resetPosBtn);
+
+                    CycleButton<Boolean> pauseToggle = CycleButton.onOffBuilder(ModConfig.get().showInPauseMenu)
+                        .create(Component.literal("In Pause Menu"), (cycleBtn, value) -> {
+                            ModConfig.get().showInPauseMenu = value;
+                            ModConfig.save();
+                        });
+                    pauseToggle.setTooltip(Tooltip.create(Component.literal("Show the Mewsic player HUD when the game is paused.")));
+
+                    CycleButton<Boolean> homeToggle = CycleButton.onOffBuilder(ModConfig.get().showOnHomeScreen)
+                        .create(Component.literal("On Home Screen"), (cycleBtn, value) -> {
+                            ModConfig.get().showOnHomeScreen = value;
+                            ModConfig.save();
+                        });
+                    homeToggle.setTooltip(Tooltip.create(Component.literal("Show the Mewsic player HUD on the main title screen.")));
+
+                    optionsList.addSmall(pauseToggle, homeToggle);
+
+                    CycleButton<Boolean> containerToggle = CycleButton.onOffBuilder(ModConfig.get().showInContainers)
+                        .create(Component.literal("In Inventory & Chests"), (cycleBtn, value) -> {
+                            ModConfig.get().showInContainers = value;
+                            ModConfig.save();
+                        });
+                    containerToggle.setTooltip(Tooltip.create(Component.literal("Show the Mewsic player HUD while in player inventory, chests, crafting tables, and all container screens.")));
+
+                    CycleButton<Boolean> otherToggle = CycleButton.onOffBuilder(ModConfig.get().showInOtherMenus)
+                        .create(Component.literal("In Other Menus"), (cycleBtn, value) -> {
+                            ModConfig.get().showInOtherMenus = value;
+                            ModConfig.save();
+                        });
+                    otherToggle.setTooltip(Tooltip.create(Component.literal("Show the Mewsic player HUD in options, advancements, statistics, and other interactive menus.")));
+
+                    optionsList.addSmall(containerToggle, otherToggle);
+
+                    Button portBtn = Button.builder(Component.literal("Port: " + ModConfig.get().port), btn -> {
+                        if (client != null) {
+                            client.setScreenAndShow(new MewsicPortScreen(soundOptionsScreen));
+                        }
+                    }).tooltip(Tooltip.create(Component.literal("WebSocket bridge server port (currently " + ModConfig.get().port + "). Click to configure the port."))).build();
+
+                    Button reconnectBtn = Button.builder(Component.literal("Reconnect to Mewsic"), btn -> {
+                        MewsicBridgeMod.restartServer();
+                        btn.setMessage(Component.literal("Reconnecting..."));
+                    }).tooltip(Tooltip.create(Component.literal("Restart the WebSocket bridge server on ws://127.0.0.1:" + ModConfig.get().port + " to reconnect to the Mewsic player."))).build();
+
+                    optionsList.addSmall(portBtn, reconnectBtn);
                 }
             }
         });
@@ -412,6 +443,10 @@ public class MewsicHudOverlay {
             cachedContextWidth = tr.width(cachedContextText);
 
             cachedTextWidth = Math.max(Math.max(cachedTitleWidth, cachedArtistWidth), cachedContextWidth);
+
+            if (playPauseBtn != null) {
+                playPauseBtn.setTooltip(Tooltip.create(Component.literal(isPlaying ? "Pause\nPause music playback" : "Play\nResume music playback")));
+            }
         }
 
         int titleColor = isPlaying ? COLOR_TITLE : COLOR_PAUSED;

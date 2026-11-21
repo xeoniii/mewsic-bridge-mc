@@ -14,9 +14,10 @@ public class MewsicBridgeMod implements ModInitializer {
     public void onInitialize() {
         LOGGER.info("[MewsicBridge] Initializing Mewsic \u2194 Minecraft bridge...");
         mewsicbridge.config.ModConfig.load();
-        wsServer = new MewsicWebSocketServer(3012);
+        int port = mewsicbridge.config.ModConfig.get().port;
+        wsServer = new MewsicWebSocketServer(port);
         wsServer.start();
-        LOGGER.info("[MewsicBridge] WebSocket server started on ws://127.0.0.1:{}", 3012);
+        LOGGER.info("[MewsicBridge] WebSocket server started on ws://127.0.0.1:{}", port);
     }
 
     public static void restartServer() {
@@ -33,10 +34,12 @@ public class MewsicBridgeMod implements ModInitializer {
             }
             try {
                 Thread.sleep(500L);
-                LOGGER.info("[MewsicBridge] Starting new WebSocket server on port {}...", 3012);
-                wsServer = new MewsicWebSocketServer(3012);
+                int port = mewsicbridge.config.ModConfig.get().port;
+                LOGGER.info("[MewsicBridge] Starting new WebSocket server on port {}...", port);
+                wsServer = new MewsicWebSocketServer(port);
                 wsServer.setReuseAddr(true);
                 wsServer.start();
+                LOGGER.info("[MewsicBridge] WebSocket server restarted on ws://127.0.0.1:{}", port);
             } catch (Exception e) {
                 LOGGER.error("[MewsicBridge] Error starting WebSocket server: {}", e.getMessage());
             }
