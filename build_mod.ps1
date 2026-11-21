@@ -7,6 +7,7 @@ $baseJars = @(
     "C:\Users\xeoniii\AppData\Roaming\.sklauncher\libraries\org\slf4j\slf4j-api\2.0.17\slf4j-api-2.0.17.jar",
     "C:\Users\xeoniii\AppData\Roaming\.sklauncher\libraries\com\google\code\gson\gson\2.14.0\gson-2.14.0.jar",
     "C:\Users\xeoniii\AppData\Roaming\.sklauncher\libraries\com\mojang\brigadier\1.3.11\brigadier-1.3.11.jar",
+    "C:\Users\xeoniii\AppData\Roaming\.sklauncher\libraries\org\lwjgl\lwjgl-sdl\3.4.3\lwjgl-sdl-3.4.3.jar",
     (Resolve-Path "extracted").Path
 )
 
@@ -66,3 +67,15 @@ Write-Host "Creating JAR $jarName..."
 & jar -cfm $targetJar "build\jar-staging\META-INF\MANIFEST.MF" -C "build\jar-staging" .
 
 Write-Host "Built $targetJar ($( (Get-Item $targetJar).Length ) bytes) successfully!"
+
+# 6. Deploy to launcher instances
+$dest1 = "C:\Users\xeoniii\AppData\Roaming\.sklauncher\instances\fo-26-3-another-one\mods\$jarName"
+$dest2 = "C:\Users\xeoniii\AppData\Roaming\.sklauncher\instances\fo-26-3\mods\$jarName"
+if (Test-Path (Split-Path $dest1)) {
+    Copy-Item $targetJar $dest1 -Force
+    Write-Host "Deployed to $dest1"
+}
+if (Test-Path (Split-Path $dest2)) {
+    Copy-Item $targetJar $dest2 -Force
+    Write-Host "Deployed to $dest2"
+}

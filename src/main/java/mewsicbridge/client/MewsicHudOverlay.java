@@ -17,6 +17,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import org.lwjgl.sdl.SDLMouse;
 
 public class MewsicHudOverlay {
     private static final int PADDING_RIGHT = 6;
@@ -51,6 +52,7 @@ public class MewsicHudOverlay {
     private static boolean dragging = false;
     private static int dragOffsetX = 0;
     private static int dragOffsetY = 0;
+    private static boolean wasMousePressed = false;
 
     private static int windowLeft = 0;
     private static int windowTop = 0;
@@ -65,6 +67,14 @@ public class MewsicHudOverlay {
         }
     }
 
+    private static boolean isLeftMouseButtonDown() {
+        try {
+            return (SDLMouse.nSDL_GetMouseState(0L, 0L) & SDLMouse.SDL_BUTTON_LMASK) != 0;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
     public static void register() {
         ScreenEvents.BEFORE_INIT.register((client, screen, scaledWidth, scaledHeight) -> {
             if (screen instanceof PauseScreen) {
@@ -73,7 +83,9 @@ public class MewsicHudOverlay {
                 });
 
                 ScreenMouseEvents.beforeMouseClick(screen).register((screenInstance, event) -> {
-                    if (event.button() == 0) {
+                    int btn = event.button();
+                    // In SDL3 left click is button 1; handle button 0 for GLFW fallback
+                    if (btn == 1 || btn == 0) {
                         double mouseX = event.x();
                         double mouseY = event.y();
                         MusicState state = MusicState.getInstance();
@@ -84,6 +96,7 @@ public class MewsicHudOverlay {
                                               || (nextBtn != null && nextBtn.isMouseOver(mouseX, mouseY));
                             if (!overButton) {
                                 dragging = true;
+                                wasMousePressed = true;
                                 if (!hasCustomPosition) {
                                     hasCustomPosition = true;
                                     customX = windowLeft;
@@ -97,20 +110,16 @@ public class MewsicHudOverlay {
                 });
 
                 ScreenMouseEvents.beforeMouseRelease(screen).register((screenInstance, event) -> {
-                    if (event.button() == 0) {
+                    int btn = event.button();
+                    if (btn == 1 || btn == 0) {
                         dragging = false;
-                    }
-                });
-
-                ScreenMouseEvents.beforeMouseDrag(screen).register((screenInstance, event, dragX, dragY) -> {
-                    if (dragging) {
-                        customX = (int)event.x() - dragOffsetX;
-                        customY = (int)event.y() - dragOffsetY;
+                        wasMousePressed = false;
                     }
                 });
 
                 ScreenEvents.remove(screen).register(screenInstance -> {
                     dragging = false;
+                    wasMousePressed = false;
                 });
             }
         });
@@ -129,19 +138,37 @@ public class MewsicHudOverlay {
                 int artistWidth = tr.width(artist);
                 int textWidth = Math.max(titleWidth, artistWidth);
                 int windowWidth = Math.max(28 + textWidth + 6, 96);
-                int right = scaledWidth - 6;
-                int left = right - windowWidth;
-                int windowHeight = 60;
-                int top = scaledHeight - windowHeight - 6;
-                int buttonsY = top + 34;
-                int buttonsStartX = left + (windowWidth - 84) / 2;
+                int windowHeight = 72;
+
+                if (hasCustomPosition) {
+                    if (customX < 0) customX = 0;
+                    if (customY < 0) customY = 0;
+                    if (customX + windowWidth > scaledWidth) customX = scaledWidth - windowWidth;
+                    if (customY + windowHeight > scaledHeight) customY = scaledHeight - windowHeight;
+                    windowLeft = customX;
+                    windowTop = customY;
+                } else {
+                    windowLeft = scaledWidth - 6 - windowWidth;
+                    windowTop = scaledHeight - windowHeight - 6;
+                }
+                windowRight = windowLeft + windowWidth;
+                windowBottom = windowTop + windowHeight;
+
+                int availableWidth = windowWidth - 12;
+                int spacing = 2;
+                int buttonAreaWidth = availableWidth - spacing * 2;
+                int playPauseWidth = buttonAreaWidth * 40 / 100;
+                int prevNextWidth = (buttonAreaWidth - playPauseWidth) / 2;
+                playPauseWidth = buttonAreaWidth - prevNextWidth * 2;
+                int buttonsY = windowTop + 46;
+                int buttonsStartX = windowLeft + 6;
 
                 prevBtn = Button.builder(Component.literal("\u23ee"), button -> {
                     if (MewsicBridgeMod.wsServer != null) {
                         MewsicBridgeMod.wsServer.broadcastAction("playPrev");
                     }
                     button.setFocused(false);
-                }).bounds(buttonsStartX, buttonsY, 24, 20).build();
+                }).bounds(buttonsStartX, buttonsY, prevNextWidth, 20).build();
                 prevBtn.visible = hasTrack;
 
                 playPauseBtn = Button.builder(Component.literal("\u23ef"), button -> {
@@ -149,7 +176,7 @@ public class MewsicHudOverlay {
                         MewsicBridgeMod.wsServer.broadcastAction("togglePlay");
                     }
                     button.setFocused(false);
-                }).bounds(buttonsStartX + 26, buttonsY, 32, 20).build();
+                }).bounds(buttonsStartX + prevNextWidth + spacing, buttonsY, playPauseWidth, 20).build();
                 playPauseBtn.visible = hasTrack;
 
                 nextBtn = Button.builder(Component.literal("\u23ed"), button -> {
@@ -157,7 +184,7 @@ public class MewsicHudOverlay {
                         MewsicBridgeMod.wsServer.broadcastAction("playNext");
                     }
                     button.setFocused(false);
-                }).bounds(buttonsStartX + 60, buttonsY, 24, 20).build();
+                }).bounds(buttonsStartX + prevNextWidth + playPauseWidth + spacing * 2, buttonsY, prevNextWidth, 20).build();
                 nextBtn.visible = hasTrack;
 
                 Screens.getWidgets(screen).add(prevBtn);
@@ -218,6 +245,36 @@ public class MewsicHudOverlay {
         int artistWidth = tr.width(artist);
         int contextWidth = tr.width(contextStr);
         int textWidth = Math.max(Math.max(titleWidth, artistWidth), contextWidth);
+
+        // Continuous mouse polling during render pass for smooth dragging on SDL3 / Vulkan / OpenGL
+        boolean isPressed = isLeftMouseButtonDown();
+        if (isPressed && !wasMousePressed) {
+            if (mouseX >= windowLeft && mouseX <= windowRight && mouseY >= windowTop && mouseY <= windowBottom) {
+                boolean overButton = false;
+                if (prevBtn != null && prevBtn.isMouseOver((double)mouseX, (double)mouseY)) {
+                    overButton = true;
+                }
+                if (playPauseBtn != null && playPauseBtn.isMouseOver((double)mouseX, (double)mouseY)) {
+                    overButton = true;
+                }
+                if (nextBtn != null && nextBtn.isMouseOver((double)mouseX, (double)mouseY)) {
+                    overButton = true;
+                }
+                if (!overButton) {
+                    dragging = true;
+                    if (!hasCustomPosition) {
+                        hasCustomPosition = true;
+                        customX = windowLeft;
+                        customY = windowTop;
+                    }
+                    dragOffsetX = mouseX - customX;
+                    dragOffsetY = mouseY - customY;
+                }
+            }
+        } else if (!isPressed && wasMousePressed) {
+            dragging = false;
+        }
+        wasMousePressed = isPressed;
 
         if (dragging) {
             customX = mouseX - dragOffsetX;
