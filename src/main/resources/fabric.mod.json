@@ -1,0 +1,32 @@
+{
+	"schemaVersion": 1,
+	"id": "mewsic-bridge",
+	"version": "1.1+26.3",
+	"name": "Mewsic Bridge",
+	"description": "Bridges the Mewsic desktop music player with Minecraft via a local WebSocket server. Displays the currently playing track on the HUD.",
+	"authors": [
+		"xeoniii"
+	],
+	"contact": {
+		"homepage": "https://xeoniii.github.io/Mewsic",
+		"issues": "https://github.com/xeoniii/Mewsic"
+	},
+	"license": "MIT",
+	"icon": "assets/mewsic-bridge/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"mewsicbridge.MewsicBridgeMod"
+		],
+		"client": [
+			"mewsicbridge.client.MewsicBridgeClient"
+		]
+	},
+
+	"depends": {
+		"fabricloader": ">=0.19.0",
+		"minecraft": ">=26.3",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}

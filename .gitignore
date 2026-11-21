@@ -1,0 +1,6 @@
+.gradle/
+build/
+fabric_libs/
+extracted/
+decompiled_src/
+*.log
