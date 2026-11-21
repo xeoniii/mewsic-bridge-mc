@@ -4,15 +4,25 @@ import java.util.Map;
 import java.util.Random;
 import mewsicbridge.MewsicBridgeMod;
 import mewsicbridge.MusicState;
+import mewsicbridge.config.ModConfig;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenMouseEvents;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.CycleButton;
+import net.minecraft.client.gui.components.OptionsList;
+import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.PauseScreen;
-import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.TitleScreen;
+import net.minecraft.client.gui.screens.achievement.StatsScreen;
+import net.minecraft.client.gui.screens.advancements.AdvancementsScreen;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.gui.screens.options.OptionsScreen;
+import net.minecraft.client.gui.screens.options.OptionsSubScreen;
+import net.minecraft.client.gui.screens.options.SoundOptionsScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -88,11 +98,22 @@ public class MewsicHudOverlay {
     }
 
     private static ItemStack getDiscStack(Item disc) {
-        if (cachedDiscStack == null || cachedDiscItem != disc) {
-            cachedDiscItem = disc;
-            cachedDiscStack = new ItemStack(disc);
+        if (disc == null) {
+            return null;
         }
-        return cachedDiscStack;
+        try {
+            // Guard against registry initialization timing (e.g. during early TitleScreen bootstrap)
+            if (!disc.builtInRegistryHolder().areComponentsBound()) {
+                return null;
+            }
+            if (cachedDiscStack == null || cachedDiscItem != disc) {
+                cachedDiscItem = disc;
+                cachedDiscStack = new ItemStack(disc);
+            }
+            return cachedDiscStack;
+        } catch (Throwable t) {
+            return null;
+        }
     }
 
     private static boolean isLeftMouseButtonDown() {
@@ -103,11 +124,53 @@ public class MewsicHudOverlay {
         }
     }
 
-    private static boolean isSupportedScreen(Screen screen) {
-        return screen instanceof PauseScreen || screen instanceof TitleScreen;
+    public static boolean isSupportedScreen(Screen screen) {
+        if (screen == null) {
+            return false;
+        }
+        ModConfig config = ModConfig.get();
+        if (!config.enabled) {
+            return false;
+        }
+
+        if (screen instanceof PauseScreen) {
+            return config.showInPauseMenu;
+        }
+        if (screen instanceof TitleScreen) {
+            return config.showOnHomeScreen;
+        }
+        // Inventory screen, chests, barrels, furnaces, crafting, all containers
+        if (screen instanceof AbstractContainerScreen) {
+            return config.showInContainers;
+        }
+        // Options, advancements, stats, and other interactive menus
+        if (screen instanceof OptionsSubScreen || screen instanceof OptionsScreen
+            || screen instanceof AdvancementsScreen || screen instanceof StatsScreen) {
+            return config.showInOtherMenus;
+        }
+        return false;
+    }
+
+    public static void resetCustomPosition() {
+        hasCustomPosition = false;
+        customX = 0;
+        customY = 0;
+        lastLayoutLeft = -1;
+        lastLayoutTop = -1;
+        lastLayoutWidth = -1;
+        ModConfig.get().hasCustomPosition = false;
+        ModConfig.get().customX = 0;
+        ModConfig.get().customY = 0;
+        ModConfig.save();
     }
 
     public static void register() {
+        // Load persisted position from config
+        ModConfig config = ModConfig.get();
+        hasCustomPosition = config.hasCustomPosition;
+        customX = config.customX;
+        customY = config.customY;
+
         ScreenEvents.BEFORE_INIT.register((client, screen, scaledWidth, scaledHeight) -> {
             if (isSupportedScreen(screen)) {
                 // Initialize playback buttons once for this screen session
@@ -190,13 +253,76 @@ public class MewsicHudOverlay {
                 ScreenMouseEvents.beforeMouseRelease(screen).register((screenInstance, event) -> {
                     int btn = event.button();
                     if (btn == 1 || btn == 0) {
-                        dragging = false;
+                        if (dragging) {
+                            dragging = false;
+                            ModConfig.get().hasCustomPosition = hasCustomPosition;
+                            ModConfig.get().customX = customX;
+                            ModConfig.get().customY = customY;
+                            ModConfig.save();
+                        }
                     }
                 });
 
                 ScreenEvents.remove(screen).register(screenInstance -> {
-                    dragging = false;
+                    if (dragging) {
+                        dragging = false;
+                        ModConfig.get().hasCustomPosition = hasCustomPosition;
+                        ModConfig.get().customX = customX;
+                        ModConfig.get().customY = customY;
+                        ModConfig.save();
+                    }
                 });
+            }
+        });
+
+        // Inject configuration entries into Options -> Music and Sounds
+        ScreenEvents.AFTER_INIT.register((client, screen, scaledWidth, scaledHeight) -> {
+            if (screen instanceof SoundOptionsScreen soundOptionsScreen) {
+                OptionsList optionsList = null;
+                for (GuiEventListener listener : soundOptionsScreen.children()) {
+                    if (listener instanceof OptionsList list) {
+                        optionsList = list;
+                        break;
+                    }
+                }
+
+                if (optionsList != null) {
+                    optionsList.addHeader(Component.literal("Mewsic Bridge"));
+                    optionsList.addSmall(
+                        CycleButton.onOffBuilder(ModConfig.get().enabled)
+                            .create(Component.literal("Mewsic HUD"), (cycleBtn, value) -> {
+                                ModConfig.get().enabled = value;
+                                ModConfig.save();
+                            }),
+                        Button.builder(Component.literal("Reset HUD Position"), btn -> {
+                            resetCustomPosition();
+                        }).build()
+                    );
+                    optionsList.addSmall(
+                        CycleButton.onOffBuilder(ModConfig.get().showInPauseMenu)
+                            .create(Component.literal("In Pause Menu"), (cycleBtn, value) -> {
+                                ModConfig.get().showInPauseMenu = value;
+                                ModConfig.save();
+                            }),
+                        CycleButton.onOffBuilder(ModConfig.get().showOnHomeScreen)
+                            .create(Component.literal("On Home Screen"), (cycleBtn, value) -> {
+                                ModConfig.get().showOnHomeScreen = value;
+                                ModConfig.save();
+                            })
+                    );
+                    optionsList.addSmall(
+                        CycleButton.onOffBuilder(ModConfig.get().showInContainers)
+                            .create(Component.literal("In Inventory & Chests"), (cycleBtn, value) -> {
+                                ModConfig.get().showInContainers = value;
+                                ModConfig.save();
+                            }),
+                        CycleButton.onOffBuilder(ModConfig.get().showInOtherMenus)
+                            .create(Component.literal("In Other Menus"), (cycleBtn, value) -> {
+                                ModConfig.get().showInOtherMenus = value;
+                                ModConfig.save();
+                            })
+                    );
+                }
             }
         });
     }
@@ -294,6 +420,10 @@ public class MewsicHudOverlay {
         if (dragging) {
             if (!isLeftMouseButtonDown()) {
                 dragging = false;
+                ModConfig.get().hasCustomPosition = hasCustomPosition;
+                ModConfig.get().customX = customX;
+                ModConfig.get().customY = customY;
+                ModConfig.save();
             } else {
                 customX = mouseX - dragOffsetX;
                 customY = mouseY - dragOffsetY;
@@ -332,8 +462,11 @@ public class MewsicHudOverlay {
         context.fill(windowLeft, windowTop, windowRight, windowBottom, -12303292);
         context.fill(windowLeft + 1, windowTop + 1, windowRight - 1, windowBottom - 1, -535818224);
 
-        // Draw disc item (reusing cached ItemStack instance to avoid per-frame allocations)
-        context.item(getDiscStack(currentDisc), windowLeft + 6, windowTop + 8);
+        // Draw disc item safely (reusing cached ItemStack, guarded against uninitialized registries)
+        ItemStack discStack = getDiscStack(currentDisc);
+        if (discStack != null) {
+            context.item(discStack, windowLeft + 6, windowTop + 8);
+        }
 
         // Render text lines with marquee scrolling if they exceed available width
         int clipLeft = windowLeft + 28;

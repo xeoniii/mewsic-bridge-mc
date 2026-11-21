@@ -13,6 +13,7 @@ public class MewsicBridgeMod implements ModInitializer {
     @Override
     public void onInitialize() {
         LOGGER.info("[MewsicBridge] Initializing Mewsic \u2194 Minecraft bridge...");
+        mewsicbridge.config.ModConfig.load();
         wsServer = new MewsicWebSocketServer(3012);
         wsServer.start();
         LOGGER.info("[MewsicBridge] WebSocket server started on ws://127.0.0.1:{}", 3012);
